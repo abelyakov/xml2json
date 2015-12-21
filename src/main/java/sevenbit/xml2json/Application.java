@@ -37,7 +37,7 @@ public class Application {
 
 			final String outputFileName = fileName + ".json";
 			try {
-				Files.write(Paths.get(outputFileName), jsonContent.toString().getBytes(), StandardOpenOption.CREATE);
+				Files.write(Paths.get(outputFileName), jsonContent.toString(4).getBytes(), StandardOpenOption.CREATE);
 				filesWritten.add(outputFileName);
 			} catch (IOException e) {
 				System.out.println("Exception while writing the result to " + outputFileName);
