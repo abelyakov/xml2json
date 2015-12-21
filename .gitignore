@@ -1,4 +1,7 @@
 .idea/
+*.class
+target/
 dependency-reduced-pom.xml
 *.swp
 *.iml
+*.jar

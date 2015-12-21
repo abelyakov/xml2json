@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -18,33 +17,83 @@ import java.util.List;
 public class Application {
 
 	public static void main(String[] args) {
-		if (args.length < 1) {
-			System.out.println("No xml files given! Usage: xmlj2json input1.xml input2.xml");
+		final Args arguments = new Args(args);
+		if (arguments.files.isEmpty()) {
+			System.out.println("No xml files given!");
+			System.out.println("Usage: java -jar xml2json.jar input1.xml input2.xml");
+			System.out.println("flag: -r  reverse transformation from json to xml");
+			return;
 		}
 
-		List<String> filesWritten = new ArrayList<String>(args.length);
-		for (String fileName : args) {
-			String content;
-			try {
-				content = String.join("\n", Files.readAllLines(Paths.get(fileName)));
-			} catch (IOException e) {
-				System.out.println("Exception while processing file " + fileName + ":");
-				System.out.println(e);
-				continue;
+		for (String fileName : arguments.files) {
+			String content = fileToString(fileName);
+			if (content == null) continue;
+
+			String outputString = "";
+			if (arguments.reverse) {
+				JSONObject jsonContent = XML.toJSONObject(content);
+				outputString = jsonContent.toString(4);
+			} else {
+				JSONObject json = new JSONObject(content);
+				outputString = XML.toString(json);
 			}
 
-			JSONObject jsonContent = XML.toJSONObject(content);
-
-			final String outputFileName = fileName + ".json";
-			try {
-				Files.write(Paths.get(outputFileName), jsonContent.toString(4).getBytes(), StandardOpenOption.CREATE);
-				filesWritten.add(outputFileName);
-			} catch (IOException e) {
-				System.out.println("Exception while writing the result to " + outputFileName);
-				System.out.println(e);
+			final String outputFileName = getOutputFileName(fileName, arguments.reverse);
+			boolean success = stringToFile(outputString, outputFileName);
+			if (success) {
+				System.out.println("output: " + outputFileName);
 			}
+		}
+	}
 
-			System.out.println("output: " + Arrays.toString(filesWritten.toArray()));
+	static String getOutputFileName(String inputName, boolean reverse) {
+		final String newPrefix = reverse ? ".xml" : ".json";
+		final String oldPrefix = reverse ? ".json" : ".xml";
+
+		if (inputName.length() > 4 && inputName.substring(inputName.length() - oldPrefix.length(), inputName.length()).equals(oldPrefix)) {
+			return inputName.substring(0, inputName.length() - oldPrefix.length()) + newPrefix;
+		}
+		return inputName + newPrefix;
+	}
+
+	private static String fileToString(String fileName) {
+		try {
+			return String.join("\n", Files.readAllLines(Paths.get(fileName)));
+		} catch (IOException e) {
+			System.out.println("Exception while processing file " + fileName + ":");
+			System.out.println(e);
+			return null;
+		}
+	}
+
+	private static boolean stringToFile(String str, String fileName) {
+		try {
+			Files.write(Paths.get(fileName), str.getBytes(), StandardOpenOption.CREATE);
+		} catch (IOException e) {
+			System.out.println("Exception while writing the result to " + fileName);
+			System.out.println(e);
+			return false;
+		}
+		return true;
+	}
+
+
+	static class Args {
+		final static String REVERSE_KEY = "-r";
+		final List<String> files;
+		final boolean reverse;
+
+		public Args(String[] args) {
+			boolean reverse = false;
+			files = new ArrayList<String>(args.length);
+			for (String arg : args) {
+				if (REVERSE_KEY.equals(arg)) {
+					reverse = true;
+				} else {
+					files.add(arg);
+				}
+			}
+			this.reverse = reverse;
 		}
 	}
 }
