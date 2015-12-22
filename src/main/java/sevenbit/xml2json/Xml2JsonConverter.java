@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 public class Xml2JsonConverter {
 	public static String xml2json(String content) {
 		DocumentBuilder builder = createDocumentBuidler();
-		if(builder == null) return null;
+		if (builder == null) return null;
 
 		InputStream stream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
 		Document document;
@@ -50,7 +50,7 @@ public class Xml2JsonConverter {
 
 		if (node.hasAttributes()) { //attributes
 			elementBuilderNotEmpty = true;
-			elementBuilder.add("attrs", getAttributesNodeBuilder(node));
+			elementBuilder.add(Constants.ATTRS, getAttributesNodeBuilder(node));
 		}
 
 		String nodeTextValue = null;
@@ -77,7 +77,7 @@ public class Xml2JsonConverter {
 		nodeTextValue = nodeTextValue == null ? "" : nodeTextValue;
 		if (elementBuilderNotEmpty) {
 			if (!nodeTextValue.isEmpty()) {
-				elementBuilder.add("#value", nodeTextValue);
+				elementBuilder.add(Constants.VALUE, nodeTextValue);
 			}
 			builder.add(node.getNodeName(), elementBuilder);
 		} else {

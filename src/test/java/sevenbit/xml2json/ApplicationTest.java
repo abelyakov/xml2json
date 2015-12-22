@@ -9,19 +9,19 @@ import org.junit.Test;
 public class ApplicationTest {
 
 	@Test
-	public void test1() {
+	public void nameWithoutPrefixTest() {
 		String name = Application.getOutputFileName("test", false);
 		Assert.assertEquals("test.json", name);
 	}
 
 	@Test
-	public void test2() {
+	public void nameWithXmlPrefixTest() {
 		String name = Application.getOutputFileName("test.xml", false);
 		Assert.assertEquals("test.json", name);
 	}
 
 	@Test
-	public void test3() {
+	public void nameWithJsonPrefixTest() {
 		String name = Application.getOutputFileName("test.json", true);
 		Assert.assertEquals("test.xml", name);
 	}

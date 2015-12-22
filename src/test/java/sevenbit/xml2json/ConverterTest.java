@@ -29,9 +29,24 @@ public class ConverterTest {
 //		System.out.println(json);
 //		System.out.println("*********************");
 		String back = Json2XmlConverter.json2xml(json);
+//		System.out.println(back);
 		String backBack = Xml2JsonConverter.xml2json(back);
 //		System.out.println(backBack);
 		Assert.assertEquals(json, backBack);
+	}
 
+	@Test
+	public void xml2jsonWithValueTest() {
+		String xmlWithValue = "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">\n" +
+				"test\n" +
+				"</soapenv:Envelope>";
+
+		String json = Xml2JsonConverter.xml2json(xmlWithValue);
+		System.out.println(json);
+		String back = Json2XmlConverter.json2xml(json);
+		System.out.println(back);
+//		String backBack = Xml2JsonConverter.xml2json(back);
+//		System.out.println(backBack);
+//		Assert.assertEquals(json, backBack);
 	}
 }

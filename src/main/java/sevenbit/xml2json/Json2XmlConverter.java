@@ -46,23 +46,27 @@ public class Json2XmlConverter {
 
 		if (entry.getValue().getValueType() == JsonValue.ValueType.OBJECT) {
 			JsonObject children = (JsonObject) entry.getValue();
-			if (children.containsKey("attrs")) {
-				JsonObject attrNode = (JsonObject) children.get("attrs");
+			if (children.containsKey(Constants.ATTRS)) {
+				JsonObject attrNode = (JsonObject) children.get(Constants.ATTRS);
 				for (Map.Entry<String, JsonValue> attr : attrNode.entrySet()) {
 					xmlElement.setAttribute(attr.getKey(), attr.getValue().toString());
 				}
 			}
 			for (Map.Entry<String, JsonValue> child : children.entrySet()) {
-				if (child.getKey().equals("attrs")) continue;   //attributes
-				JsonValue.ValueType childValueType = child.getValue().getValueType();
+				if (child.getKey().equals(Constants.ATTRS)) continue;   //attributes
+				if (child.getKey().equals(Constants.VALUE)) {       //attributes with value
+					xmlElement.setTextContent(child.getValue().toString().replace("\"", ""));
+				} else {
+					JsonValue.ValueType childValueType = child.getValue().getValueType();
 
-				if (childValueType == JsonValue.ValueType.OBJECT) {
-					convertJsonNode(doc, xmlElement, child);
-				} else if(childValueType == JsonValue.ValueType.STRING) {
-					if(!child.getValue().toString().isEmpty()) { //text child element
-						Element textChildElement = doc.createElement(child.getKey());
-						xmlElement.appendChild(textChildElement);
-						textChildElement.setTextContent(child.getValue().toString().replace("\"", ""));
+					if (childValueType == JsonValue.ValueType.OBJECT) {
+						convertJsonNode(doc, xmlElement, child);
+					} else if (childValueType == JsonValue.ValueType.STRING) {
+						if (!child.getValue().toString().isEmpty()) { //text child element
+							Element textChildElement = doc.createElement(child.getKey());
+							xmlElement.appendChild(textChildElement);
+							textChildElement.setTextContent(child.getValue().toString().replace("\"", ""));
+						}
 					}
 				}
 			}
