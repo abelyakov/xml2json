@@ -25,4 +25,14 @@ public class ApplicationTest {
 		String name = Application.getOutputFileName("test.json", true);
 		Assert.assertEquals("test.xml", name);
 	}
+
+	@Test
+	public void argsTest() {
+		Application.Args args = new Application.Args(new String[]{"-r", "one"});
+		Assert.assertEquals(true, args.reverse);
+
+		args = new Application.Args(new String[]{"-rr", "one"});
+		Assert.assertEquals(false, args.reverse);
+
+	}
 }

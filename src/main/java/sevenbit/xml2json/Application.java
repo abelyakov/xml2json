@@ -1,8 +1,5 @@
 package sevenbit.xml2json;
 
-import org.json.JSONObject;
-import org.json.XML;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -19,9 +16,7 @@ public class Application {
 	public static void main(String[] args) {
 		final Args arguments = new Args(args);
 		if (arguments.files.isEmpty()) {
-			System.out.println("No xml files given!");
-			System.out.println("Usage: java -jar xml2json.jar input1.xml input2.xml");
-			System.out.println("flag: -r  reverse transformation from json to xml");
+			printInfoMessage();
 			return;
 		}
 
@@ -29,17 +24,12 @@ public class Application {
 			String content = fileToString(fileName);
 			if (content == null) continue;
 
-			String outputString = "";
-			if (arguments.reverse) {
-				JSONObject jsonContent = XML.toJSONObject(content);
-				outputString = jsonContent.toString(4);
-			} else {
-				JSONObject json = new JSONObject(content);
-				outputString = XML.toString(json);
-			}
+			String convertedContent = arguments.reverse
+					? Json2XmlConverter.json2xml(content)
+					: Xml2JsonConverter.xml2json(content);
 
 			final String outputFileName = getOutputFileName(fileName, arguments.reverse);
-			boolean success = stringToFile(outputString, outputFileName);
+			boolean success = stringToFile(convertedContent, outputFileName);
 			if (success) {
 				System.out.println("output: " + outputFileName);
 			}
@@ -75,6 +65,12 @@ public class Application {
 			return false;
 		}
 		return true;
+	}
+
+	private static void printInfoMessage() {
+		System.out.println("No xml files given!");
+		System.out.println("Usage: java -jar xml2json.jar input1.xml input2.xml");
+		System.out.println("flag: -r  reverse transformation from json to xml");
 	}
 
 
