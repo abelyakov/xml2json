@@ -1,7 +1,5 @@
 package sevenbit.xml2json;
 
-import org.w3c.dom.Document;
-
 import javax.json.Json;
 import javax.json.JsonStructure;
 import javax.json.JsonWriter;
@@ -13,10 +11,8 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.HashMap;
@@ -55,30 +51,6 @@ public class PprintUtils {
 		return config;
 	}
 
-//	public static String pprintXML(org.w3c.dom.Node element) {
-////		Transformer transformer = null;
-////		try {
-////			transformer = TransformerFactory.newInstance().newTransformer();
-////			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-////			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
-////
-////		} catch (TransformerConfigurationException e) {
-////			e.printStackTrace();
-////			return null;
-////		}
-////		StreamResult result = new StreamResult(new StringWriter());
-////		DOMSource source = new DOMSource(element);
-////		try {
-////			transformer.transform(source, result);
-////		} catch (TransformerException e) {
-////			e.printStackTrace();
-////			return null;
-////		}
-////		return result.getWriter().toString();
-//
-//
-//	}
-
 	public static void prettyPrintXML(Source source, OutputStream stream) {
 		try {
 			Transformer transformer = TransformerFactory.newInstance()
@@ -92,22 +64,10 @@ public class PprintUtils {
 			e.printStackTrace(System.out);
 		}
 	}
-
-	public static void prettyPrintXML(Document doc, OutputStream stream) {
-		prettyPrintXML(new DOMSource(doc), stream);
-	}
-
-
 	public static String prettyPrintXML(org.w3c.dom.Node doc) {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		prettyPrintXML(new DOMSource(doc), baos);
 		return new String(baos.toByteArray(), Charset.defaultCharset()).replace("&amp;", "&").replace("&quot;", "");
-
-
-	}
-
-	public static void prettyPrintXML(String xmlString, OutputStream stream) {
-		prettyPrintXML(new StreamSource(new StringReader(xmlString)), stream);
 	}
 
 }
