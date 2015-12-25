@@ -4,6 +4,7 @@ import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
 import javax.json.Json;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonObjectBuilder;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -12,15 +13,17 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by andy on 12/22/15.
  */
 public class Xml2JsonConverter {
 	public static String xml2json(String content) {
-		DocumentBuilder builder = createDocumentBuidler();
+		if (content.trim().isEmpty()) return "";
+		DocumentBuilder builder = createDocumentBuilder();
 		if (builder == null) return null;
-
 		InputStream stream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
 		Document document;
 		try {
@@ -30,72 +33,163 @@ public class Xml2JsonConverter {
 			return null;
 		}
 
-		JsonObjectBuilder jsonBuilder = Json.createObjectBuilder();
-
 		document.getDocumentElement().normalize();
 		Element element = document.getDocumentElement();
-		convertXmlNode(element, jsonBuilder);
-
-
-		String result = PprintUtils.prettyPrint(jsonBuilder.build());
-		return result;
+		Deque<DocumentNode> q = buildNodesQueue(element);
+		return elementQueueToJson(q);
 	}
 
+	static String elementQueueToJson(Deque<DocumentNode> q) {
+		if (q.isEmpty()) return "";
 
-	private static void convertXmlNode(Node node, JsonObjectBuilder builder) {
-		if (node.getNodeType() != Node.ELEMENT_NODE)
-			return;
-		JsonObjectBuilder elementBuilder = Json.createObjectBuilder();
-		boolean elementBuilderNotEmpty = false;
+		int parentId = q.getFirst().parentId;
 
-		if (node.hasAttributes()) { //attributes
-			elementBuilderNotEmpty = true;
-			elementBuilder.add(Constants.ATTRS, getAttributesNodeBuilder(node));
+		Map<Integer, JsonObjectBuilder> childBuilders = new HashMap<>();
+		while (!q.isEmpty()) {
+			Map<String, List<DocumentNode>> siblings = pollSiblings(q);
+			JsonObjectBuilder builder = Json.createObjectBuilder();
+			siblings.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).forEach(e -> processSiblings(e.getValue(), childBuilders, builder));
+			DocumentNode cur = siblings.entrySet().iterator().next().getValue().iterator().next();
+			childBuilders.put(cur.parentId, builder);
 		}
+		JsonObjectBuilder mainBuilder = childBuilders.get(parentId);
+		return PprintUtils.prettyPrint(mainBuilder.build());
+	}
 
-		String nodeTextValue = null;
-		if (node.hasChildNodes()) { //children
-			NodeList children = node.getChildNodes();
-			for (int i = 0; i < children.getLength(); ++i) {
-				Node child = children.item(i);
-				switch (child.getNodeType()) {
-					case Node.ELEMENT_NODE:
-						elementBuilderNotEmpty = true;
-						convertXmlNode(child, elementBuilder);
-						break;
-					case Node.TEXT_NODE:
-						String textValue = child.getNodeValue().trim();
-						if (textValue.isEmpty()) continue;
-						if (nodeTextValue != null)
-							throw new RuntimeException("node already have text value: " + nodeTextValue + "new text value: " + textValue);
-						nodeTextValue = textValue;
-						break;
+	static void fillAttributes(Map<String, String> attributes, JsonObjectBuilder builder) {
+		JsonObjectBuilder attrBuilder = Json.createObjectBuilder();
+		attributes.entrySet().stream()
+				.forEach(e -> attrBuilder.add(e.getKey(), e.getValue()));
+		builder.add(Constants.ATTRS, attrBuilder);
+	}
+
+	//poll all siblings from queue and group them by name
+	static Map<String, List<DocumentNode>> pollSiblings(Deque<DocumentNode> q) {
+		DocumentNode cur = q.pollLast();
+		List<DocumentNode> siblings = new ArrayList<>();
+		siblings.add(cur);
+		while (true) { //collect all siblings
+			DocumentNode next = q.peekLast();
+			if (next != null && next.parentId == cur.parentId) {
+				q.pollLast();
+				siblings.add(next);
+			} else {
+				break;
+			}
+		}
+		return siblings.stream().collect(Collectors.groupingBy(s -> s.name));
+	}
+
+	static void processSiblings(List<DocumentNode> siblings, Map<Integer, JsonObjectBuilder> childBuilders, JsonObjectBuilder parentBuilder) {
+		if (siblings.size() == 1) {
+			DocumentNode s = siblings.get(0);
+			JsonObjectBuilder childBuilder = childBuilders.get(s.id);
+			//атрибуты
+			if (childBuilder != null) {
+				if (!s.attributes.isEmpty()) {
+					fillAttributes(s.attributes, childBuilder);
+				}
+				parentBuilder.add(s.name, childBuilder);
+
+			} else {
+				if (!s.attributes.isEmpty()) {
+					childBuilder = Json.createObjectBuilder();
+					fillAttributes(s.attributes, childBuilder);
+					if (s.text != null && !s.text.isEmpty())
+						childBuilder.add(Constants.VALUE, s.text);
+					parentBuilder.add(s.name, childBuilder);
+				} else {
+					parentBuilder.add(s.name, s.text == null ? "" : s.text);
+				}
+			}
+
+		} else {
+			JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+			for (DocumentNode s : siblings) {
+				JsonObjectBuilder childBuilder = childBuilders.get(s.id);
+				if (childBuilder != null) {
+					if (!s.attributes.isEmpty()) {
+						fillAttributes(s.attributes, childBuilder);
+					}
+					arrayBuilder.add(childBuilder);
+				} else {
+					if (!s.attributes.isEmpty()) {
+						childBuilder = Json.createObjectBuilder();
+						fillAttributes(s.attributes, childBuilder);
+						if (s.text != null && !s.text.isEmpty())
+							childBuilder.add(Constants.VALUE, s.text);
+						arrayBuilder.add(childBuilder);
+					} else {
+						arrayBuilder.add(s.text == null ? "" : s.text);
+					}
+				}
+			}
+			parentBuilder.add(siblings.get(0).name, arrayBuilder);
+		}
+	}
+
+	static Deque<DocumentNode> buildNodesQueue(Node root) {
+		//обходим дерево в ширину (по уровням) и формируем очередь с узлами дерева
+		Deque<NodeWithParent> q = new ArrayDeque<>();
+		Deque<DocumentNode> result = new ArrayDeque<>();
+		q.add(new NodeWithParent(root, null));
+		while (!q.isEmpty()) {
+			NodeWithParent withDepth = q.removeFirst();
+			Node n = withDepth.node;
+			if (n.getNodeType() == Node.ELEMENT_NODE) {
+				DocumentNode docCurrent = new DocumentNode();
+				docCurrent.name = n.getNodeName();
+				docCurrent.parentId = System.identityHashCode(n.getParentNode());
+				docCurrent.id = System.identityHashCode(n);
+				if (n.hasAttributes()) {
+					docCurrent.attributes = getAttributesMap(n);
+				}
+				result.add(docCurrent);
+
+				for (int i = 0; i < n.getChildNodes().getLength(); ++i) {
+					q.add(new NodeWithParent(n.getChildNodes().item(i), docCurrent));
+				}
+
+			} else if (n.getNodeType() == Node.TEXT_NODE) {
+				String textValue = n.getNodeValue().trim();
+				if (withDepth.parent != null) {
+					if (!textValue.isEmpty()) {
+						withDepth.parent.text = textValue;
+					}
 				}
 			}
 		}
+		return result;
+	}
 
-		nodeTextValue = nodeTextValue == null ? "" : nodeTextValue;
-		if (elementBuilderNotEmpty) {
-			if (!nodeTextValue.isEmpty()) {
-				elementBuilder.add(Constants.VALUE, nodeTextValue);
-			}
-			builder.add(node.getNodeName(), elementBuilder);
-		} else {
-			builder.add(node.getNodeName(), nodeTextValue);
+	static Map<String, String> getAttributesMap(Node node) {
+		HashMap<String, String> result = new HashMap<>(node.getAttributes().getLength());
+		for (int i = 0; i < node.getAttributes().getLength(); ++i) {
+			Attr attr = (Attr) node.getAttributes().item(i);
+			result.put(attr.getNodeName(), attr.getNodeValue());
+		}
+		return result;
+	}
+
+	static class DocumentNode {
+		Map<String, String> attributes = new HashMap<>();
+		int parentId;
+		int id;
+		String text;
+		String name;
+	}
+
+	static class NodeWithParent {
+		final Node node;
+		final DocumentNode parent;
+
+		public NodeWithParent(Node node, DocumentNode parent) {
+			this.node = node;
+			this.parent = parent;
 		}
 	}
 
-	private static JsonObjectBuilder getAttributesNodeBuilder(Node element) {
-		NamedNodeMap attributes = element.getAttributes();
-		JsonObjectBuilder builder = Json.createObjectBuilder();
-		for (int i = 0; i < attributes.getLength(); ++i) {
-			Attr attr = (Attr) attributes.item(i);
-			builder.add(attr.getNodeName(), attr.getNodeValue());
-		}
-		return builder;
-	}
-
-	static DocumentBuilder createDocumentBuidler() {
+	static DocumentBuilder createDocumentBuilder() {
 		DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
 		try {
 			return builderFactory.newDocumentBuilder();
@@ -104,4 +198,5 @@ public class Xml2JsonConverter {
 			return null;
 		}
 	}
+
 }

@@ -4,12 +4,11 @@ package sevenbit.xml2json;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.JsonValue;
+import javax.json.*;
 import javax.xml.parsers.DocumentBuilder;
 import java.io.StringReader;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
 
 /**
@@ -18,60 +17,84 @@ import java.util.Map;
 public class Json2XmlConverter {
 
 	public static String json2xml(String content) {
-		DocumentBuilder builder = Xml2JsonConverter.createDocumentBuidler();
+		if (content.trim().isEmpty()) return "";
+		DocumentBuilder builder = Xml2JsonConverter.createDocumentBuilder();
 		if (builder == null) return null;
 		Document doc = builder.newDocument();
-
-
 		JsonObject jsonObject = null;
 		try (JsonReader jsonReader = Json.createReader(new StringReader(content))) {
 			jsonObject = jsonReader.readObject();
 			if (jsonObject.entrySet().size() > 1)
 				throw new RuntimeException("Only one root node allowed");
-
 			Map.Entry<String, JsonValue> root = jsonObject.entrySet().iterator().next();
-			convertJsonNode(doc, null, root);
+			convertJsonDocument(doc, root);
 			return PprintUtils.prettyPrintXML(doc);
-
 		}
 	}
 
-	private static void convertJsonNode(Document doc, Element parent, Map.Entry<String, JsonValue> entry) {
-		Element xmlElement = doc.createElement(entry.getKey());
+	private static void convertJsonDocument(Document doc, Map.Entry<String, JsonValue> rootEntry) {
+		Deque<JsonNodeWithParent> stack = new ArrayDeque<>();
+		stack.push(new JsonNodeWithParent(rootEntry, null));
+
+		while (!stack.isEmpty()) {
+			JsonNodeWithParent pair = stack.pop();
+			JsonValue.ValueType type = pair.node.getValueType();
+			if (type == JsonValue.ValueType.OBJECT) {
+				Element e = doc.createElement(pair.name);
+				JsonObject children = (JsonObject) pair.node;
+				//attributes
+				if (children.containsKey(Constants.ATTRS)) {
+					JsonObject attrNode = (JsonObject) children.get(Constants.ATTRS);
+					attrNode.entrySet().forEach(attr -> e.setAttribute(attr.getKey(), attr.getValue().toString()));
+				}
+				children.entrySet().stream()
+						.sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
+						.filter(c -> !c.getKey().equals(Constants.ATTRS))
+						.forEach(c -> {
+							if (c.getKey().equals(Constants.VALUE)) {
+								e.setTextContent(c.getValue().toString().replace("\"", ""));
+							} else {
+								stack.push(new JsonNodeWithParent(c, e));
+							}
+						});
+				appendChild(e, pair.parent, doc);
+			} else if (type == JsonValue.ValueType.ARRAY) {
+				JsonArray array = (JsonArray) pair.node;
+				array.stream().forEach(c -> stack.push(new JsonNodeWithParent(pair.name, c, pair.parent)));
+			} else if (type == JsonValue.ValueType.STRING) {
+				if (pair.node.toString().isEmpty())
+					continue;
+				Element e = doc.createElement(pair.name);
+				e.setTextContent(pair.node.toString().replace("\"", ""));
+				appendChild(e, pair.parent, doc);
+			}
+		}
+	}
+
+	private static void appendChild(Element e, Element parent, Document doc) {
 		if (parent != null) {
-			parent.appendChild(xmlElement);
+			parent.appendChild(e);
 		} else {
-			doc.appendChild(xmlElement);
+			doc.appendChild(e);
+		}
+	}
+
+	static class JsonNodeWithParent {
+		final String name;
+		final JsonValue node;
+		final Element parent;
+
+		public JsonNodeWithParent(Map.Entry<String, JsonValue> entry, Element parentXml) {
+			this.name = entry.getKey();
+			this.node = entry.getValue();
+			this.parent = parentXml;
 		}
 
-		if (entry.getValue().getValueType() == JsonValue.ValueType.OBJECT) {
-			JsonObject children = (JsonObject) entry.getValue();
-			if (children.containsKey(Constants.ATTRS)) {
-				JsonObject attrNode = (JsonObject) children.get(Constants.ATTRS);
-				for (Map.Entry<String, JsonValue> attr : attrNode.entrySet()) {
-					xmlElement.setAttribute(attr.getKey(), attr.getValue().toString());
-				}
-			}
-			for (Map.Entry<String, JsonValue> child : children.entrySet()) {
-				if (child.getKey().equals(Constants.ATTRS)) continue;   //attributes
-				if (child.getKey().equals(Constants.VALUE)) {       //attributes with value
-					xmlElement.setTextContent(child.getValue().toString().replace("\"", ""));
-				} else {
-					JsonValue.ValueType childValueType = child.getValue().getValueType();
-
-					if (childValueType == JsonValue.ValueType.OBJECT) {
-						convertJsonNode(doc, xmlElement, child);
-					} else if (childValueType == JsonValue.ValueType.STRING) {
-						if (!child.getValue().toString().isEmpty()) { //text child element
-							Element textChildElement = doc.createElement(child.getKey());
-							xmlElement.appendChild(textChildElement);
-							textChildElement.setTextContent(child.getValue().toString().replace("\"", ""));
-						}
-					}
-				}
-			}
-
+		public JsonNodeWithParent(String name, JsonValue node, Element parent) {
+			this.name = name;
+			this.node = node;
+			this.parent = parent;
 		}
-
 	}
 }
+
