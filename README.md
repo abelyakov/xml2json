@@ -30,7 +30,7 @@ Simple example:
     }
 }
 ```
-All xml-attributes converts to json-field with name "attr":
+Xml-attributes will be converted to json-field with name "attr":
 
 ```
 <one level="1"></one>
