@@ -61,7 +61,10 @@ public class Json2XmlConverter {
 			} else if (type == JsonValue.ValueType.ARRAY) {
 				JsonArray array = (JsonArray) pair.node;
 				array.stream().forEach(c -> stack.push(new JsonNodeWithParent(pair.name, c, pair.parent)));
-			} else if (type == JsonValue.ValueType.STRING) {
+			} else if (type == JsonValue.ValueType.STRING
+					|| type == JsonValue.ValueType.TRUE
+					|| type == JsonValue.ValueType.FALSE
+					|| type == JsonValue.ValueType.NUMBER){
 				if (pair.node.toString().isEmpty())
 					continue;
 				Element e = doc.createElement(pair.name);

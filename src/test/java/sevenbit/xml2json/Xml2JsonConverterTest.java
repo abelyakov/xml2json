@@ -12,6 +12,14 @@ import static sevenbit.xml2json.Xml2JsonConverter.xml2json;
 public class Xml2JsonConverterTest {
 
 	@Test
+	public void realWorldTest() {
+		String input = "{\"v1:UpdateAvailableResource\":{\"id\":\"13878189867\",\"departmentId\":\"13947473\",\"name\":\"\\\"Тестовый ресурс15\\\"\",\"allowSelfService\":true,\"doctorOnDuty\":\"false\",\"employees\":[{\"id\":\"11313225\",\"isMain\":true}],\"receptionTypes\":[{\"id\":\"1863\",\"isAvailable\":false}],\"serviceAreaTypes\":[\"451052\",\"209\"],\"complexResources\":[\"13355213\",\"13354188\"],\"ldps\":[{\"id\":\"135261\",\"isAvailable\":true}],\"version\":\"2\",\"attrs\":{\"xmlns:v1\":\"http://emias2.gov.ru/resources/v1/\"}}}";
+		String xml = json2xml(input);
+		Assert.assertTrue(input.contains("allowSelfService"));
+		Assert.assertTrue(xml.contains("allowSelfService"));
+	}
+
+	@Test
 	public void emptyStringTest() {
 		String input = "";
 		xmlJsonXmlJsonTest(input, true);
@@ -22,7 +30,6 @@ public class Xml2JsonConverterTest {
 		String input = "<one></one>";
 		xmlJsonXmlJsonTest(input, true);
 	}
-
 	@Test
 	public void oneTagWithAttrsTest() {
 		String input = "<one name=\"1\"></one>";
